@@ -1,3 +1,7 @@
+## 1.0.0
+
+- Make SqlCrdt abstract
+
 ## 0.0.9+4
 
 - Add some more documentation
