@@ -1,3 +1,7 @@
+## 1.0.1
+
+- Update to latest sql_crdt
+
 ## 1.0.0
 
 - Make SqlCrdt abstract

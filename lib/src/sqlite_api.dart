@@ -2,9 +2,6 @@ import 'package:sqflite_common/sqlite_api.dart';
 import 'package:sql_crdt/sql_crdt.dart';
 
 class SqliteApi extends DatabaseApi {
-  @override
-  final trueVal = 1;
-
   final DatabaseExecutor _db;
 
   SqliteApi(this._db);
