@@ -1,3 +1,8 @@
+## 1.1.1
+
+- Fix change notifications when no changes were made
+- Guard against a possible race condition when setting the canonical time
+
 ## 1.1.0
 
 - Breaking: return Hlc.zero instead of null in `lastModified`
