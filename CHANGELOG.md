@@ -1,3 +1,7 @@
+## 1.1.1+1
+
+- Default `singleInstance` to false when opening a database in memory
+
 ## 1.1.1
 
 - Fix change notifications when no changes were made

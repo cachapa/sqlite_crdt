@@ -33,7 +33,7 @@ class SqliteCrdt extends SqlCrdt {
   /// Open a transient SQLite in memory.
   /// Useful for testing or temporary sessions.
   static Future<SqliteCrdt> openInMemory({
-    bool singleInstance = true,
+    bool singleInstance = false,
     int? version,
     FutureOr<void> Function(BaseCrdt crdt, int version)? onCreate,
     FutureOr<void> Function(BaseCrdt crdt, int from, int to)? onUpgrade,

@@ -7,7 +7,6 @@ void main() {
 
     setUp(() async {
       crdt = await SqliteCrdt.openInMemory(
-        singleInstance: false,
         version: 1,
         onCreate: (db, version) async {
           await db.execute('''
@@ -141,7 +140,6 @@ void main() {
 
     setUp(() async {
       crdt = await SqliteCrdt.openInMemory(
-        singleInstance: false,
         version: 1,
         onCreate: (db, version) async {
           await db.execute('''
