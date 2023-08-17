@@ -1,3 +1,7 @@
+## 1.1.1+2
+
+- Add `CrdtChangeset` type alias
+
 ## 1.1.1+1
 
 - Default `singleInstance` to false when opening a database in memory
