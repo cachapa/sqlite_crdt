@@ -1,3 +1,7 @@
+## 2.0.0
+
+- Update to latest `sql_crdt` version
+
 ## 1.1.1+2
 
 - Add `CrdtChangeset` type alias

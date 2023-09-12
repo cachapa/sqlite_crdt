@@ -119,7 +119,7 @@ void main() {
     });
 
     test('Merge', () async {
-      final hlc = Hlc.now('test_node_id').toString();
+      final hlc = Hlc.now('test_node_id');
       await crdt.merge({
         'users': [
           {
@@ -131,7 +131,7 @@ void main() {
       });
       final result = await crdt.query('SELECT * FROM users');
       expect(result.first['name'], 'John Doe');
-      expect(result.first['hlc'], hlc);
+      expect(result.first['hlc'] as String, hlc.toString());
     });
   });
 
@@ -237,7 +237,7 @@ void main() {
           {
             'id': 1,
             'name': 'John Doe',
-            'hlc': Hlc.now('test_node_id').toString(),
+            'hlc': Hlc.now('test_node_id'),
           },
         ],
       });

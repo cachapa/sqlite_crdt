@@ -1,5 +1,4 @@
 import 'package:sqlite_crdt/sqlite_crdt.dart';
-import 'package:uuid/uuid.dart';
 
 Future<void> main() async {
   // Create or load the database
@@ -32,7 +31,7 @@ Future<void> main() async {
       {
         'id': 2,
         'name': 'Jane Doe',
-        'hlc': Hlc.now(Uuid().v4()).toString(),
+        'hlc': Hlc.now(generateNodeId()),
       },
     ],
   });
