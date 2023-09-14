@@ -1,3 +1,7 @@
+## 2.1.0
+
+- Update to latest `sql_crdt` version
+
 ## 2.0.0
 
 - Update to latest `sql_crdt` version

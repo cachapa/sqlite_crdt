@@ -25,7 +25,8 @@ void main() {
     });
 
     test('Canonical time', () async {
-      expect(crdt.canonicalTime.millis, 0);
+      expect(crdt.canonicalTime.dateTime,
+          DateTime.fromMillisecondsSinceEpoch(0).toUtc());
 
       await _insertUser(crdt, 1, 'John Doe');
       final result = await crdt.query('SELECT * FROM users');
