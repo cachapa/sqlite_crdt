@@ -13,9 +13,10 @@ import 'src/is_web_locator.dart';
 
 export 'package:sqflite_common/sqlite_api.dart';
 export 'package:sql_crdt/sql_crdt.dart';
+export 'src/serializable.dart';
 
 class SqliteCrdt extends SqlCrdt {
-  SqliteCrdt._(SqliteApi db) : super(db);
+  SqliteCrdt._(super.db);
 
   /// Open or create a SQLite container as a SqlCrdt instance.
   ///
@@ -27,8 +28,9 @@ class SqliteCrdt extends SqlCrdt {
     int? version,
     FutureOr<void> Function(BaseCrdt crdt, int version)? onCreate,
     FutureOr<void> Function(BaseCrdt crdt, int from, int to)? onUpgrade,
+    bool migrate = false,
   }) =>
-      _open(path, false, singleInstance, version, onCreate, onUpgrade);
+      _open(path, false, singleInstance, version, onCreate, onUpgrade, migrate: migrate);
 
   /// Open a transient SQLite in memory.
   /// Useful for testing or temporary sessions.
@@ -37,8 +39,9 @@ class SqliteCrdt extends SqlCrdt {
     int? version,
     FutureOr<void> Function(BaseCrdt crdt, int version)? onCreate,
     FutureOr<void> Function(BaseCrdt crdt, int from, int to)? onUpgrade,
+    bool migrate = false,
   }) =>
-      _open(null, true, singleInstance, version, onCreate, onUpgrade);
+      _open(null, true, singleInstance, version, onCreate, onUpgrade, migrate: migrate);
 
   static Future<SqliteCrdt> _open(
     String? path,
@@ -47,6 +50,7 @@ class SqliteCrdt extends SqlCrdt {
     int? version,
     FutureOr<void> Function(BaseCrdt crdt, int version)? onCreate,
     FutureOr<void> Function(BaseCrdt crdt, int from, int to)? onUpgrade,
+    {bool migrate = false}
   ) async {
     if (sqliteCrdtIsWeb && !inMemory && path!.contains('/')) {
       path = path.substring(path.lastIndexOf('/') + 1);
@@ -75,7 +79,24 @@ class SqliteCrdt extends SqlCrdt {
     );
 
     final crdt = SqliteCrdt._(SqliteApi(db));
-    await crdt.init();
+    try {
+      await crdt.init();
+    } on DatabaseException catch (e) {
+      // ignore
+      final err = e.toString();
+      if (e.getResultCode() == 1 && err.contains('no such column: modified') && migrate) {
+        await crdt.migrate();
+      } else {
+        rethrow;
+      }
+    }
     return crdt;
   }
+
+  @override
+  Future<void> close() async {
+    return databaseApi.close();
+  }
+
+  Batch batch() => (databaseApi as Database).batch();
 }

@@ -33,4 +33,33 @@ class SqliteApi extends DatabaseApi {
     assert(_db is Database, 'Cannot start a transaction within a transaction');
     return (_db as Database).transaction((t) => action(SqliteApi(t)));
   }
+
+  Batch batch() => _db.batch();
+
+  @override
+  Future<List<Map<String, Object?>>> rawQuery(String sql,
+      [List<Object?>? arguments]) {
+    return _db.rawQuery(sql, arguments);
+  }
+
+  @override
+  Future<int> rawUpdate(String sql, [List<Object?>? arguments]) {
+    return _db.rawUpdate(sql, arguments);
+  }
+
+  @override
+  Future<int> rawInsert(String sql, [List<Object?>? arguments]) {
+    return _db.rawInsert(sql, arguments);
+  }
+
+  @override
+  Future<int> rawDelete(String sql, [List<Object?>? arguments]) {
+    return _db.rawDelete(sql, arguments);
+  }
+
+  @override
+  Future<void> close() {
+    return (_db as Database).close();
+  }
 }
+
