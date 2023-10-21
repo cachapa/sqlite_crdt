@@ -16,6 +16,14 @@ void main() {
               PRIMARY KEY (id)
             )
           ''');
+          await db.execute('''
+            CREATE TABLE user_reference (
+              id INTEGER NOT NULL,
+              user_id INTEGER NOT NULL,
+              reference INTEGER NOT NULL, 
+              PRIMARY KEY (id)
+            )
+          ''');
         },
       );
     });
@@ -133,6 +141,26 @@ void main() {
       final result = await crdt.query('SELECT * FROM users');
       expect(result.first['name'], 'John Doe');
       expect(result.first['hlc'] as String, hlc.toString());
+    });
+
+    test('List of integer arguments', () async {
+      // Tests for regression where adding CRDT arguments
+      // blows up the argument list due to type mismatch
+      await crdt.execute('''
+        INSERT INTO user_reference (id, user_id, reference)
+        VALUES (?1, ?2, ?3)
+      ''', <int>[1, 1, 2]);
+      final result = await crdt.query('SELECT * FROM user_reference');
+      expect(result.first['reference'], 2);
+    });
+
+    test('Empty arguments', () async {
+      await crdt.execute('''
+        INSERT INTO users (id, name)
+        VALUES (2, 'Jane Roe')
+      ''',[]);
+      final result = await crdt.query('SELECT * FROM users');
+      expect(result.first['name'], 'Jane Roe');
     });
   });
 
