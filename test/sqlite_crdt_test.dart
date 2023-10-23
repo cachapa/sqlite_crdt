@@ -134,6 +134,15 @@ void main() {
       expect(result.first['name'], 'John Doe');
       expect(result.first['hlc'] as String, hlc.toString());
     });
+
+    test('Insert without arguments', () async {
+      await crdt.execute('''
+        INSERT INTO users (id, name)
+        VALUES (1, 'John Doe')
+      ''');
+      final result = await crdt.query('SELECT * FROM users');
+      expect(result.first['name'], 'John Doe');
+    });
   });
 
   group('Watch', () {
