@@ -58,12 +58,55 @@ void main() {
       expect(result.first['name'], 'John Doe');
     });
 
+    test('Insert without arguments', () async {
+      await crdt.execute('''
+        INSERT INTO users (id, name)
+        VALUES (1, 'John Doe')
+      ''');
+      final result = await crdt.query('SELECT * FROM users');
+      expect(result.first['name'], 'John Doe');
+    });
+
     test('Replace', () async {
       await _insertUser(crdt, 1, 'John Doe');
       final insertHlc =
           (await crdt.query('SELECT hlc FROM users')).first['hlc'] as String;
       await crdt.execute(
           'REPLACE INTO users (id, name) VALUES (?1, ?2)', [1, 'Jane Doe']);
+      final result = await crdt.query('SELECT * FROM users');
+      expect(result.first['name'], 'Jane Doe');
+      expect((result.first['hlc'] as String).compareTo(insertHlc), 1);
+    });
+
+    test('Replace without arguments', () async {
+      await _insertUser(crdt, 1, 'John Doe');
+      final insertHlc =
+          (await crdt.query('SELECT hlc FROM users')).first['hlc'] as String;
+      await crdt
+          .execute("REPLACE INTO users (id, name) VALUES (1, 'Jane Doe')");
+      final result = await crdt.query('SELECT * FROM users');
+      expect(result.first['name'], 'Jane Doe');
+      expect((result.first['hlc'] as String).compareTo(insertHlc), 1);
+    });
+
+    test('Update', () async {
+      await _insertUser(crdt, 1, 'John Doe');
+      final insertHlc =
+          (await crdt.query('SELECT hlc FROM users')).first['hlc'] as String;
+      await _updateUser(crdt, 1, 'Jane Doe');
+      final result = await crdt.query('SELECT * FROM users');
+      expect(result.first['name'], 'Jane Doe');
+      expect((result.first['hlc'] as String).compareTo(insertHlc), 1);
+    });
+
+    test('Update without arguments', () async {
+      await _insertUser(crdt, 1, 'John Doe');
+      final insertHlc =
+          (await crdt.query('SELECT hlc FROM users')).first['hlc'] as String;
+      await crdt.execute('''
+        UPDATE users SET name = 'Jane Doe'
+        WHERE id = 1
+      ''');
       final result = await crdt.query('SELECT * FROM users');
       expect(result.first['name'], 'Jane Doe');
       expect((result.first['hlc'] as String).compareTo(insertHlc), 1);
@@ -82,11 +125,14 @@ void main() {
       expect((result.first['hlc'] as String).compareTo(insertHlc), 1);
     });
 
-    test('Update', () async {
+    test('Upsert without arguments', () async {
       await _insertUser(crdt, 1, 'John Doe');
       final insertHlc =
           (await crdt.query('SELECT hlc FROM users')).first['hlc'] as String;
-      await _updateUser(crdt, 1, 'Jane Doe');
+      await crdt.execute('''
+        INSERT INTO users (id, name) VALUES (1, 'Jane Doe')
+        ON CONFLICT (id) DO UPDATE SET name = 'Jane Doe'
+      ''');
       final result = await crdt.query('SELECT * FROM users');
       expect(result.first['name'], 'Jane Doe');
       expect((result.first['hlc'] as String).compareTo(insertHlc), 1);
@@ -98,6 +144,17 @@ void main() {
         DELETE FROM users
         WHERE id = ?1
       ''', [1]);
+      final result = await crdt.query('SELECT * FROM users');
+      expect(result.first['name'], 'John Doe');
+      expect(result.first['is_deleted'], 1);
+    });
+
+    test('Delete without arguments', () async {
+      await _insertUser(crdt, 1, 'John Doe');
+      await crdt.execute('''
+        DELETE FROM users
+        WHERE id = 1
+      ''');
       final result = await crdt.query('SELECT * FROM users');
       expect(result.first['name'], 'John Doe');
       expect(result.first['is_deleted'], 1);
@@ -133,15 +190,6 @@ void main() {
       final result = await crdt.query('SELECT * FROM users');
       expect(result.first['name'], 'John Doe');
       expect(result.first['hlc'] as String, hlc.toString());
-    });
-
-    test('Insert without arguments', () async {
-      await crdt.execute('''
-        INSERT INTO users (id, name)
-        VALUES (1, 'John Doe')
-      ''');
-      final result = await crdt.query('SELECT * FROM users');
-      expect(result.first['name'], 'John Doe');
     });
   });
 
