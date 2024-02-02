@@ -1,3 +1,7 @@
+## 2.1.4+1
+
+- Allow closing underlying database
+
 ## 2.1.4
 
 - Fix failed inserts and updates with null argument lists

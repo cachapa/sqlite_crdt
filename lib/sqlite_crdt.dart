@@ -15,7 +15,9 @@ export 'package:sqflite_common/sqlite_api.dart';
 export 'package:sql_crdt/sql_crdt.dart';
 
 class SqliteCrdt extends SqlCrdt {
-  SqliteCrdt._(SqliteApi super.db);
+  final Database _db;
+
+  SqliteCrdt._(this._db) : super(SqliteApi(_db));
 
   /// Open or create a SQLite container as a SqlCrdt instance.
   ///
@@ -39,6 +41,8 @@ class SqliteCrdt extends SqlCrdt {
     FutureOr<void> Function(BaseCrdt crdt, int from, int to)? onUpgrade,
   }) =>
       _open(null, true, singleInstance, version, onCreate, onUpgrade);
+
+  Future<void> close() => _db.close();
 
   static Future<SqliteCrdt> _open(
     String? path,
@@ -74,7 +78,7 @@ class SqliteCrdt extends SqlCrdt {
       ),
     );
 
-    final crdt = SqliteCrdt._(SqliteApi(db));
+    final crdt = SqliteCrdt._(db);
     await crdt.init();
     return crdt;
   }
