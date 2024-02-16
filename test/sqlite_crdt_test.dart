@@ -193,6 +193,44 @@ void main() {
     });
   });
 
+  group('Write from query', () {
+    late SqlCrdt crdt;
+
+    setUp(() async {
+      crdt = await SqliteCrdt.openInMemory(
+        version: 1,
+        onCreate: (db, version) async {
+          await db.execute('''
+            CREATE TABLE users (
+              id INTEGER NOT NULL,
+              name TEXT,
+              PRIMARY KEY (id)
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE other_users (
+              id INTEGER NOT NULL,
+              name TEXT,
+              PRIMARY KEY (id)
+            )
+          ''');
+        },
+      );
+      await _insertUser(crdt, 1, 'John Doe');
+    });
+
+    test('Insert from select', () async {
+      await crdt.execute('''
+        INSERT INTO other_users (id, name)
+        SELECT id, name FROM users
+      ''');
+      final result1 = await crdt.query('SELECT * FROM users');
+      final result2 = await crdt.query('SELECT * FROM other_users');
+      expect(result2.first['name'], 'John Doe');
+      expect(result2.first['hlc'], isNot(result1.first['hlc']));
+    });
+  });
+
   group('Watch', () {
     late SqlCrdt crdt;
 

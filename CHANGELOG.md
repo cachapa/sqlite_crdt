@@ -1,3 +1,7 @@
+## 2.1.7
+
+- Add support for inserts from select queries
+
 ## 2.1.4+1
 
 - Allow closing underlying database
