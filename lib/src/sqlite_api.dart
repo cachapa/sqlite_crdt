@@ -1,23 +1,12 @@
+import 'dart:async';
+
 import 'package:sqflite_common/sqlite_api.dart';
 import 'package:sql_crdt/sql_crdt.dart';
 
-class SqliteApi extends DatabaseApi {
+class ExecutorApi extends DatabaseApi {
   final DatabaseExecutor _db;
 
-  SqliteApi(this._db);
-
-  @override
-  Future<Iterable<String>> getTables() async => (await _db.rawQuery('''
-        SELECT name FROM sqlite_schema
-        WHERE type ='table' AND name NOT LIKE 'sqlite_%'
-      ''')).map((e) => e['name'] as String);
-
-  @override
-  Future<Iterable<String>> getPrimaryKeys(String table) async =>
-      (await _db.rawQuery('''
-         SELECT name FROM pragma_table_info(?1)
-         WHERE pk > 0
-       ''', [table])).map((e) => e['name'] as String);
+  ExecutorApi(this._db);
 
   @override
   Future<void> execute(String sql, [List<Object?>? args]) =>
@@ -28,9 +17,28 @@ class SqliteApi extends DatabaseApi {
       _db.rawQuery(sql, args);
 
   @override
-  Future<void> transaction(
-      Future<void> Function(DatabaseApi txn) action) async {
+  Future<void> transaction(Future<void> Function(ReadWriteApi api) actions) {
     assert(_db is Database, 'Cannot start a transaction within a transaction');
-    return (_db as Database).transaction((t) => action(SqliteApi(t)));
+    return (_db as Database).transaction((t) => actions(ExecutorApi(t)));
   }
+
+  @override
+  Future<void> executeBatch(
+      FutureOr<void> Function(WriteApi api) actions) async {
+    final batch = _db.batch();
+    actions(BatchApi(batch));
+    await batch.commit();
+  }
+}
+
+/// Simplified wrapper intended for Sqlite batches.
+class BatchApi extends WriteApi {
+  final Batch _batch;
+
+  BatchApi(this._batch);
+
+  void query(String sql, [List<Object?>? args]) => _batch.rawQuery(sql, args);
+
+  @override
+  void execute(String sql, [List<Object?>? args]) => _batch.execute(sql, args);
 }

@@ -1,3 +1,13 @@
+## 3.0.0
+
+Major performance refactor with a few breaking changes
+
+- Change how tables and primary keys are fetched to minimize reads
+- Allow for more efficient bulk writing using Sqlite batches
+- Rework abstractions to expose the Sqlite batch API
+- Rename classes to better reflect their goals
+- Correctly identify and forbid semicolon separated statements
+
 ## 2.1.7
 
 - Add support for inserts from select queries
