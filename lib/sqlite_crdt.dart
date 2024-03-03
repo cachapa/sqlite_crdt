@@ -28,8 +28,8 @@ class SqliteCrdt extends SqlCrdt {
     String path, {
     bool singleInstance = true,
     int? version,
-    FutureOr<void> Function(Database db, int version)? onCreate,
-    FutureOr<void> Function(Database db, int from, int to)? onUpgrade,
+    FutureOr<void> Function(CrdtTableExecutor db, int version)? onCreate,
+    FutureOr<void> Function(CrdtTableExecutor db, int from, int to)? onUpgrade,
   }) =>
       _open(path, false, singleInstance, version, onCreate, onUpgrade);
 
@@ -41,28 +41,16 @@ class SqliteCrdt extends SqlCrdt {
     FutureOr<void> Function(CrdtTableExecutor db, int version)? onCreate,
     FutureOr<void> Function(CrdtTableExecutor db, int from, int to)? onUpgrade,
   }) =>
-      _open(
-        null,
-        true,
-        singleInstance,
-        version,
-        onCreate == null
-            ? null
-            : (db, version) =>
-                onCreate(CrdtTableExecutor(ExecutorApi(db)), version),
-        onUpgrade == null
-            ? null
-            : (db, from, to) =>
-                onUpgrade(CrdtTableExecutor(ExecutorApi(db)), from, to),
-      );
+      _open(null, true, singleInstance, version, onCreate, onUpgrade);
 
   static Future<SqliteCrdt> _open(
     String? path,
     bool inMemory,
     bool singleInstance,
     int? version,
-    FutureOr<void> Function(Database db, int version)? onCreate,
-    FutureOr<void> Function(Database db, int from, int to)? onUpgrade,
+    FutureOr<void> Function(CrdtTableExecutor crdt, int version)? onCreate,
+    FutureOr<void> Function(CrdtTableExecutor crdt, int from, int to)?
+        onUpgrade,
   ) async {
     if (sqliteCrdtIsWeb && !inMemory && path!.contains('/')) {
       path = path.substring(path.lastIndexOf('/') + 1);
@@ -80,8 +68,14 @@ class SqliteCrdt extends SqlCrdt {
       options: SqfliteOpenDatabaseOptions(
         singleInstance: singleInstance,
         version: version,
-        onCreate: onCreate,
-        onUpgrade: onUpgrade,
+        onCreate: onCreate == null
+            ? null
+            : (db, version) =>
+                onCreate(CrdtTableExecutor(ExecutorApi(db)), version),
+        onUpgrade: onUpgrade == null
+            ? null
+            : (db, from, to) =>
+                onUpgrade(CrdtTableExecutor(ExecutorApi(db)), from, to),
       ),
     );
 

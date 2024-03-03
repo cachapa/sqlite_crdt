@@ -7,7 +7,7 @@ import 'package:sqlite_crdt/src/sqlite_api.dart';
 ///
 /// Note that timestamps are fixed at the moment of instantiation, so creating
 /// long-lived batches is discouraged.
-class BatchExecutor extends CrdtExecutor {
+class BatchExecutor extends CrdtWriteExecutor {
   final Batch _batch;
 
   BatchExecutor(this._batch, Hlc hlc) : super(BatchApi(_batch), hlc);

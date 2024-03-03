@@ -1,3 +1,7 @@
+## 3.0.0+1
+
+- Fix missing `query` method in transactions and onCreate and onUpgrade callbacks
+
 ## 3.0.0
 
 Major performance refactor with a few breaking changes
