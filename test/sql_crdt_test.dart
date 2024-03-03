@@ -166,17 +166,51 @@ void runSqlCrdtTests(SqlCrdt crdt) {
       expect(result.first['hlc'] as String, hlc.toString());
     });
 
+    test('Merge changeset with multiple tables', () async {
+      await crdt.execute('''
+        CREATE TABLE other_users (
+          id INTEGER NOT NULL,
+          name TEXT,
+          PRIMARY KEY (id)
+        )
+      ''');
+
+      final length = 10;
+      final hlc = Hlc.now('test_node_id');
+      final changeset = {
+        'users': List.generate(
+          length,
+          (i) => {'id': i, 'name': 'John Doe $i', 'hlc': hlc},
+        ),
+        'other_users': List.generate(
+          length,
+          (i) => {'id': i, 'name': 'John Doe $i', 'hlc': hlc},
+        ),
+      };
+      await crdt.merge(changeset);
+
+      final result1 = await crdt.query('SELECT * FROM users');
+      expect(result1.length, length);
+      expect(result1.first['name'], 'John Doe 0');
+      expect(result1.first['hlc'] as String, hlc.toString());
+      expect(result1.last['name'], 'John Doe ${length - 1}');
+      expect(result1.first['hlc'] as String, hlc.toString());
+
+      final result2 = await crdt.query('SELECT * FROM other_users');
+      expect(result2.length, length);
+      expect(result2.first['name'], 'John Doe 0');
+      expect(result2.first['hlc'] as String, hlc.toString());
+      expect(result2.last['name'], 'John Doe ${length - 1}');
+      expect(result2.first['hlc'] as String, hlc.toString());
+    });
+
     test('Merge large changeset', () async {
       final length = 10000;
       final hlc = Hlc.now('test_node_id');
       final changeset = {
         'users': List.generate(
           length,
-          (i) => {
-            'id': i,
-            'name': 'John Doe $i',
-            'hlc': hlc,
-          },
+          (i) => {'id': i, 'name': 'John Doe $i', 'hlc': hlc},
         ),
       };
       await crdt.merge(changeset);
