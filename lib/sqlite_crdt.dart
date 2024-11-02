@@ -1,5 +1,3 @@
-library sqlite_crdt;
-
 import 'dart:async';
 
 // ignore: implementation_imports
