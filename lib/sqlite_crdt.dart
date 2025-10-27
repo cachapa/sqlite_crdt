@@ -97,6 +97,6 @@ class SqliteCrdt extends SqlCrdt {
          WHERE pk > 0
        ''', [table])).map((e) => e['name'] as String);
 
-  BatchExecutor batch() =>
-      BatchExecutor(_db.batch(), canonicalTime.increment());
+  BatchExecutor batch() => BatchExecutor(_db.batch(), canonicalTime.increment(),
+      (affectedTables, hlc) => onDatasetChanged(affectedTables, hlc));
 }
