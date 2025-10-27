@@ -1,6 +1,6 @@
 name: sqlite_crdt
 description: Dart implementation of Conflict-free Replicated Data Types (CRDTs) using Sqlite
-version: 3.0.3
+version: 3.0.4
 homepage: https://github.com/cachapa/sqlite_crdt
 repository: https://github.com/cachapa/sqlite_crdt
 issue_tracker: https://github.com/cachapa/sqlite_crdt/issues
@@ -9,11 +9,11 @@ environment:
   sdk: ^3.0.0
 
 dependencies:
-  sqflite_common: ^2.5.5
-  sqflite_common_ffi: ^2.3.5
-  sqflite_common_ffi_web: ^1.0.0
   sql_crdt: ^3.0.3
 #    path: ../sql_credit
+  sqflite_common: ^2.5.6
+  sqflite_common_ffi: ^2.3.6
+  sqflite_common_ffi_web: ^1.0.1+2
 
 dev_dependencies:
   lints: any

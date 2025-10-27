@@ -9,9 +9,16 @@ import 'package:sqlite_crdt/src/sqlite_api.dart';
 /// long-lived batches is discouraged.
 class BatchExecutor extends CrdtWriteExecutor {
   final Batch _batch;
+  final Future<void> Function(Iterable<String> affectedTables, Hlc hlc)
+      onCommit;
 
-  BatchExecutor(this._batch, Hlc hlc) : super(BatchApi(_batch), hlc);
+  BatchExecutor(this._batch, Hlc hlc, this.onCommit)
+      : super(BatchApi(_batch), hlc);
 
   /// Commit this batch atomically. See Sqlite documentation for details.
-  Future<List<Object?>> commit() => _batch.commit();
+  Future<List<Object?>> commit() async {
+    final result = await _batch.commit();
+    await onCommit(affectedTables, hlc);
+    return result;
+  }
 }

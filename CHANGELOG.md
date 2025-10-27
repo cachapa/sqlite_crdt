@@ -1,3 +1,8 @@
+## 3.0.4
+
+- Fix batch commits not triggering change events (#15)
+- Update dependencies
+
 ## 3.0.3
 
 - Update dependencies
