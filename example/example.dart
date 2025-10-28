@@ -3,6 +3,7 @@ import 'package:sqlite_crdt/sqlite_crdt.dart';
 Future<void> main() async {
   // Create or load the database
   final crdt = await SqliteCrdt.openInMemory(
+    collections: ['users'],
     version: 1,
     onCreate: (db, version) async {
       // Create a table
@@ -16,84 +17,76 @@ Future<void> main() async {
     },
   );
 
-  // Insert an entry into the database
-  await crdt.execute('''
-    INSERT INTO users (id, name)
-    VALUES (?1, ?2)
-  ''', [1, 'John Doe']);
+  print('Watch the users table');
+  crdt
+      .watch('SELECT * FROM users')
+      .listen((e) => print('${e.isEmpty ? '[]' : e.join('\n')}\n'));
+  // Watches emit immediately, so allow a time for the initial query to run:
+  await Future.delayed(Duration(milliseconds: 10));
 
-  // Delete it
+  print('Insert a user');
+  await crdt.execute(
+    '''
+      INSERT INTO users (id, name)
+      VALUES (?1, ?2)
+    ''',
+    [1, 'John Doe'],
+  );
+  await Future.delayed(Duration(milliseconds: 10));
+
+  print('Query the database');
+  final result = await crdt.query('SELECT * FROM users');
+  print(result.first['name']);
+
+  print('Delete the user');
   await crdt.execute('DELETE FROM users WHERE id = ?1', [1]);
+  await Future.delayed(Duration(milliseconds: 10));
 
-  // Merge a remote dataset
+  print('Merge a remote dataset');
   await crdt.merge({
     'users': [
       {
-        'id': 2,
-        'name': 'Jane Doe',
+        'id': '2',
         'hlc': Hlc.now(generateNodeId()),
+        'data': {'id': 2, 'name': 'Jane Doe'},
       },
     ],
   });
+  await Future.delayed(Duration(milliseconds: 10));
 
-  // Queries are simple SQL statements, but note:
-  // 1. The CRDT columns: hlc, modified, is_deleted
-  // 2. Mr. Doe appears in the results with is_deleted = 1
-  final result = await crdt.query('SELECT * FROM users');
-  printRecords('SELECT * FROM users', result);
+  print('Update a user');
+  await crdt.execute(
+    '''
+      UPDATE users SET name = ?1
+      WHERE id = ?2
+    ''',
+    ['Jane Doe', 2],
+  );
+  await Future.delayed(Duration(milliseconds: 10));
 
-  // Perhaps a better query would be
-  final betterResult =
-      await crdt.query('SELECT id, name FROM users WHERE is_deleted = 0');
-  printRecords('SELECT id, name FROM users WHERE is_deleted = 0', betterResult);
-
-  // We can also watch for results to a specific query, but be aware that this
-  // can be inefficient since it reruns watched queries on every database change
-  crdt.watch('SELECT id, name FROM users WHERE is_deleted = 0').listen((e) =>
-      printRecords(
-          'Watch: SELECT id, name FROM users WHERE is_deleted = 0', e));
-
-  // Update the database
-  await crdt.execute('''
-    UPDATE users SET name = ?1
-    WHERE id = ?2
-  ''', ['Jane Doe 👍', 2]);
-
-  // Because entries are just marked as deleted, undoing deletes is trivial
-  await crdt.execute('''
-    UPDATE users SET is_deleted = ?1
-    WHERE id = ?2
-  ''', [1, 1]);
-
-  // Perform multiple writes inside a transaction so they get the same timestamp
+  print('Multiple writes inside a transaction for atomical updates');
   await crdt.transaction((txn) async {
     // Make sure you use the transaction object (txn)
     // Using [crdt] here will cause a deadlock
-    await txn.execute('''
-      INSERT INTO users (id, name)
-      VALUES (?1, ?2)
-    ''', [3, 'Uncle Doe']);
-    await txn.execute('''
-      INSERT INTO users (id, name)
-      VALUES (?1, ?2)
-    ''', [4, 'Grandma Doe']);
+    await txn.execute(
+      '''
+        INSERT INTO users (id, name)
+        VALUES (?1, ?2)
+      ''',
+      [3, 'Uncle Doe'],
+    );
+    await txn.execute(
+      '''
+        INSERT INTO users (id, name)
+        VALUES (?1, ?2)
+      ''',
+      [4, 'Grandma Doe'],
+    );
   });
-  final timestamps =
-      await crdt.query('SELECT id, hlc, modified FROM users WHERE id > 2');
-  printRecords('SELECT id, hlc, modified FROM users WHERE id > 2', timestamps);
+  await Future.delayed(Duration(milliseconds: 10));
 
-  // Create a changeset to synchronize with another node
+  print('Create a changeset to sync with other nodes');
   final changeset = await crdt.getChangeset();
-  print('> Changeset size: ${changeset.recordCount} records');
-  changeset.forEach((key, value) {
-    print(key);
-    for (var e in value) {
-      print('  $e');
-    }
-  });
-}
-
-void printRecords(String title, List<Map<String, Object?>> records) {
-  print('> $title');
-  records.forEach(print);
+  print('Changeset size: ${changeset.recordCount} records');
+  changeset.prettyPrint();
 }
