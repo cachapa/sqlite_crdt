@@ -22,7 +22,6 @@ typedef OnUpgrade = Future<void> Function(Database db, int from, int to);
 
 class SqliteCrdt extends Crdt {
   final String crdtTable;
-  String get crdtViewPrefix => '${crdtTable}_view';
   final Database _db;
   final Map<String, Iterable<String>> _tableIndexes;
 
@@ -139,6 +138,13 @@ class SqliteCrdt extends Crdt {
               PRIMARY KEY (collection, id)
             )
           ''');
+          // Create indexes for performance
+          await (db.execute(
+            'CREATE INDEX "node_id_idx" ON "crdt" ("node_id")',
+          ));
+          await (db.execute(
+            'CREATE INDEX "modified_idx" ON "crdt" ("modified")',
+          ));
           // Run custom onCreate operations
           await onCreate?.call(db, version);
         },

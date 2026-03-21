@@ -4,7 +4,6 @@ Future<void> main() async {
   // Create or load the database
   final crdt = await SqliteCrdt.openInMemory(
     collections: ['users'],
-    version: 1,
     onCreate: (db, version) async {
       // Create a table
       await db.execute('''

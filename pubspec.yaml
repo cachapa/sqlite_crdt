@@ -15,6 +15,7 @@ dependencies:
       url: https://github.com/cachapa/crdt.git
       ref: v6
 
+  #sqlite3: ^3.2.0
   sqflite_common: ^2.5.6
   sqflite_common_ffi: ^2.4.0+2
   sqflite_common_ffi_web: ^1.1.1
