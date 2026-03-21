@@ -19,20 +19,14 @@ class CrdtExecutor {
       query(sql, arguments);
 
   Future<Result> query(String sql, [List<Object?>? arguments]) {
-    final statements = _sqlEngine
-        .parse(ParserEntrypoint.multiple, sql)
-        .rootNode
-        .statements;
-    assert(
-      statements.length == 1,
-      'This package does not support compound statements:\n$sql',
-    );
+    final statement = _sqlEngine
+        .parse(ParserEntrypoint.statement, sql)
+        .rootNode;
 
-    return switch (statements.first) {
-      InsertStatement _ || UpdateStatement _ || DeleteStatement _ => _execute(
-        statements.first as HasPrimarySource,
-        arguments,
-      ),
+    return switch (statement) {
+      InsertStatement _ ||
+      UpdateStatement _ ||
+      DeleteStatement _ => _execute(statement as HasPrimarySource, arguments),
       _ => _db.rawQuery(sql, arguments),
     };
   }
@@ -96,14 +90,9 @@ class Query {
   late final Set<String> affectedTables = SqlUtil.getAffectedTables(sql);
 
   Query(this.sql, [this.params]) {
-    final statements = _sqlEngine
-        .parse(ParserEntrypoint.multiple, sql)
-        .rootNode
-        .statements;
     assert(
-      statements.length == 1,
-      'This package does not support compound statements:\n$sql',
+      _sqlEngine.parse(ParserEntrypoint.statement, sql).rootNode
+          is SelectStatement,
     );
-    assert(statements.first is SelectStatement);
   }
 }
