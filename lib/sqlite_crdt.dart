@@ -162,7 +162,7 @@ class SqliteCrdt extends Crdt {
 
       // Create view over joined CRDT, and data tables
       await db.execute('''
-        CREATE VIEW $crdtTableView AS
+        CREATE TEMP VIEW $crdtTableView AS
           SELECT
             $table.*,
             $crdtTable.id AS crdt_id,
