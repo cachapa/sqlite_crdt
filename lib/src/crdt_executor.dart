@@ -1,4 +1,3 @@
-import 'package:sqlite_crdt/src/sql_util.dart';
 import 'package:sqlparser/sqlparser.dart';
 
 import '../sqlite_crdt.dart';
@@ -10,6 +9,7 @@ class CrdtExecutor {
   final String crdtTable;
   final Map<String, Iterable<String>> _crdtFields;
   final Hlc hlc;
+  int get modified => hlc.logicalTime;
 
   final affectedTables = <String>{};
 
@@ -87,12 +87,9 @@ class CrdtExecutor {
 class Query {
   final String sql;
   final List<Object?>? params;
-  late final Set<String> affectedTables = SqlUtil.getAffectedTables(sql);
+  // late final Set<String> affectedTables = SqlUtil.getAffectedTables(sql);
 
   Query(this.sql, [this.params]) {
-    assert(
-      _sqlEngine.parse(ParserEntrypoint.statement, sql).rootNode
-          is SelectStatement,
-    );
+    assert(sql.trim().toUpperCase().startsWith('SELECT '), sql);
   }
 }

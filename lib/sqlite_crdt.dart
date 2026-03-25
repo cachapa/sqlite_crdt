@@ -28,8 +28,7 @@ class SqliteCrdt extends Crdt {
   final _watches = <StreamController<Result>, Query>{};
 
   @override
-  Iterable<String> get collections => tables;
-  Iterable<String> get tables => _tableIndexes.keys;
+  Iterable<String> get collections => _tableIndexes.keys;
 
   @override
   int get canonicalTime => _canonicalTime;
@@ -147,41 +146,26 @@ class SqliteCrdt extends Crdt {
           ));
           // Run custom onCreate operations
           await onCreate?.call(db, version);
+          // Create CRDT views
+          for (final table in collections) {
+            await _createCrdtView(db, table, crdtTable);
+          }
         },
         onUpgrade: (db, from, to) async {
           await onUpgrade?.call(db, from, to);
           // TODO Sync all unknown values?
+          // Recreate CRDT views
+          for (final table in collections) {
+            await _createCrdtView(db, table, crdtTable);
+          }
         },
       ),
     );
 
     final tableColumns = <String, Iterable<String>>{};
     for (final table in collections) {
-      final crdtTableView = '${crdtTable}_${table}_view';
-
       // Read table information
-      tableColumns[table] ??= (await db.rawQuery(
-        'SELECT name FROM pragma_table_info(?1) WHERE pk > 0',
-        [table],
-      )).map((e) => e['name'] as String);
-      final keys = tableColumns[table]!;
-
-      // Create view over joined CRDT, and data tables
-      await db.execute('''
-        CREATE TEMP VIEW $crdtTableView AS
-          SELECT
-            $table.*,
-            $crdtTable.id AS crdt_id,
-            $crdtTable.hlc AS crdt_hlc,
-            $crdtTable.node_id AS crdt_node_id,
-            $crdtTable.modified AS crdt_modified,
-            $table.${keys.first} IS NULL AS crdt_is_deleted
-          FROM $crdtTable
-          LEFT JOIN $table ON
-            crdt_id = ${keys.map((e) => '$table.$e').join(" || '::' || ")}
-          WHERE
-            $crdtTable.collection = '$table'
-      ''');
+      tableColumns[table] ??= await _getTableKeys(db, table);
     }
 
     // Get canonical time
@@ -210,6 +194,42 @@ class SqliteCrdt extends Crdt {
     return SqliteCrdt._(nodeId, maxModified, crdtTable, db, tableColumns);
   }
 
+  /// Get key columns for a given table
+  static Future<Iterable<String>> _getTableKeys(
+    Database db,
+    String table,
+  ) async => (await db.rawQuery(
+    'SELECT name FROM pragma_table_info(?1) WHERE pk > 0',
+    [table],
+  )).map((e) => e['name'] as String);
+
+  /// Create view over joined CRDT, and data tables
+  static Future<void> _createCrdtView(
+    Database db,
+    String table,
+    String crdtTable,
+  ) async {
+    String crdtTableView = 'crdt_${table}_view';
+
+    final keys = await _getTableKeys(db, table);
+    await db.execute('DROP VIEW IF EXISTS $crdtTableView');
+    await db.execute('''
+        CREATE VIEW $crdtTableView AS
+          SELECT
+            $table.*,
+            $crdtTable.id AS crdt_id,
+            $crdtTable.hlc AS crdt_hlc,
+            $crdtTable.node_id AS crdt_node_id,
+            $crdtTable.modified AS crdt_modified,
+            $table.${keys.first} IS NULL AS crdt_is_deleted
+          FROM $crdtTable
+          LEFT JOIN $table ON
+            crdt_id = ${keys.map((e) => '$table.$e').join(" || '::' || ")}
+          WHERE
+            $crdtTable.collection = '$table'
+      ''');
+  }
+
   Future<void> execute(String sql, [List<Object?>? arguments]) =>
       query(sql, arguments);
 
@@ -223,7 +243,7 @@ class SqliteCrdt extends Crdt {
     final result = await executor.query(sql, arguments);
     if (executor.affectedTables.isNotEmpty) {
       _canonicalTime = executor.hlc.logicalTime;
-      _emitQueries(executor.affectedTables);
+      _emitQueries(executor.affectedTables, executor.modified);
     }
     return result;
   }
@@ -242,8 +262,8 @@ class SqliteCrdt extends Crdt {
       await action(executor);
     });
     if (executor.affectedTables.isNotEmpty) {
-      _canonicalTime = executor.hlc.logicalTime;
-      _emitQueries(executor.affectedTables);
+      _canonicalTime = executor.modified;
+      _emitQueries(executor.affectedTables, executor.modified);
     }
   }
 
@@ -251,38 +271,39 @@ class SqliteCrdt extends Crdt {
 
   @override
   Future<CrdtChangeset> getChangeset({
+    Iterable<String>? onlyCollections,
+    Map<String, Query>? partialCollections,
     String? onlyNodeId,
     String? exceptNodeId,
     int? modifiedOn,
     int? modifiedAfter,
-    Iterable<String>? collections,
-    Map<String, Query>? partialCollections,
   }) async {
     // Avoid invalid selector combinations
     assert(onlyNodeId == null || exceptNodeId == null);
     assert(modifiedOn == null || modifiedAfter == null);
     // Ensure no collection appears in both filters
     assert(
-      collections == null ||
+      onlyCollections == null ||
           partialCollections == null ||
-          collections
+          onlyCollections
               .toSet()
               .intersection(partialCollections.keys.toSet())
               .isEmpty,
     );
 
     // Return all collections if none have been specified
-    if (partialCollections == null) collections ??= tables;
+    if (partialCollections == null) onlyCollections ??= collections;
     // Coalesce collection filters
     final queries = {
-      for (final t in collections ?? <String>{}) t: Query('SELECT * FROM $t'),
+      for (final t in onlyCollections ?? <String>{})
+        t: Query('SELECT * FROM $t'),
       ...partialCollections ?? {},
     };
 
     // Ensure all collections are known
     assert(
-      queries.keys.toSet().difference(tables.toSet()).isEmpty,
-      'Unrecognized table(s): ${queries.keys.toSet().difference(tables.toSet()).join(', ')}.',
+      queries.keys.toSet().difference(collections.toSet()).isEmpty,
+      'Unrecognized table(s): ${queries.keys.toSet().difference(collections.toSet()).join(', ')}.',
     );
 
     final changeset = <String, Iterable<Map<String, dynamic>>>{};
@@ -304,9 +325,8 @@ class SqliteCrdt extends Crdt {
       // Replace references to tables with their CRDT view counterparts
       var sql = SqlUtil.replaceTables(
         query.sql,
-        (t) => '${crdtTable}_${t}_view',
+        (t) => collections.contains(t) ? '${crdtTable}_${t}_view' : t,
       );
-      print(sql);
 
       // Return all deleted records for partial collections.
       // This is necessary since it's impossible to know which deleted records
@@ -321,25 +341,34 @@ class SqliteCrdt extends Crdt {
       if ((modifiedOn != null || modifiedAfter != null) &&
           partialCollections != null &&
           partialCollections.containsKey(collection)) {
-        // Get max modified date from join queries.
-        // This ensures joined records appear when new relations are created
-        // even if their modified date is older than the requested, e.g. getting
-        // all products referenced in the purchases table.
-        final isJoin = sql.toLowerCase().contains('join');
-        if (isJoin) {
-          final tables = SqlUtil.getAffectedTables(sql);
-          assert(tables.length > 1);
-          sql = sql.replaceFirst(
-            RegExp(r'SELECT', caseSensitive: false),
-            'SELECT MAX(${tables.map((t) => '$t.crdt_modified').join(', ')}) AS crdt_modified,',
-          );
-        }
         sql =
-            '$sql UNION SELECT ${isJoin ? 'crdt_modified,' : ''} * FROM ${crdtTable}_${collection}_view WHERE crdt_is_deleted = true';
+            '$sql UNION SELECT * FROM ${crdtTable}_${collection}_view WHERE crdt_is_deleted = true';
       }
 
+      /* This doesn't work as intended. Has to be checked manually for now */
+      // if ((modifiedOn != null || modifiedAfter != null) &&
+      //     partialCollections != null &&
+      //     partialCollections.containsKey(collection)) {
+      //   // Get max modified date from join queries.
+      //   // This ensures joined records appear when new relations are created
+      //   // even if their modified date is older than the requested, e.g. getting
+      //   // all products referenced in the purchases table.
+      //   final isJoin = sql.toLowerCase().contains('join');
+      //   if (isJoin) {
+      //     final tables = SqlUtil.getAffectedTables(sql);
+      //     assert(tables.length > 1, sql);
+      //     sql = sql.replaceFirst(
+      //       RegExp(r'SELECT', caseSensitive: false),
+      //       'SELECT MAX(${tables.map((t) => '$t.crdt_modified').join(', ')}) AS crdt_modified,',
+      //     );
+      //   }
+      //   sql =
+      //       '$sql UNION SELECT ${isJoin ? 'crdt_modified,' : ''} * FROM ${crdtTable}_${collection}_view WHERE crdt_is_deleted = true';
+      // }
+      /* This doesn't work as intended. Has to be checked manually for now */
+
       final result = await _db.rawQuery(
-        'SELECT * FROM ($sql) $whereClause',
+        'SELECT * FROM ($sql) $whereClause ORDER BY crdt_modified ASC',
         [
           ...query.params ?? [],
           onlyNodeId,
@@ -375,10 +404,7 @@ class SqliteCrdt extends Crdt {
         : '';
     final result = await _db.rawQuery(
       'SELECT max(modified) AS modified FROM $crdtTable $whereStatement',
-      [
-        if (onlyNodeId != null) onlyNodeId,
-        if (exceptNodeId != null) exceptNodeId,
-      ],
+      [?onlyNodeId, ?exceptNodeId],
     );
     return result.first['modified'] as int? ?? 0;
   }
@@ -436,7 +462,7 @@ class SqliteCrdt extends Crdt {
             var i = 1;
             final whereClause = _tableIndexes[table]!
                 .map((e) => '$e = \$${i++}')
-                .join(', ');
+                .join(' AND ');
             recordsBatch.execute(
               'DELETE FROM $table WHERE $whereClause',
               record.id.split('::'),
@@ -463,7 +489,7 @@ class SqliteCrdt extends Crdt {
     });
 
     _canonicalTime = newCanonical;
-    _emitQueries(affectedTables);
+    _emitQueries(affectedTables, newCanonical);
   }
 
   Stream<Result> watch(String sql, [List<Object?>? params]) {
@@ -483,14 +509,27 @@ class SqliteCrdt extends Crdt {
     return controller.stream;
   }
 
-  void _emitQueries(Set<String> affectedTables) {
+  void _emitQueries(Set<String> affectedTables, int timestamp) {
+    if (affectedTables.isEmpty) return;
     // Trigger watched queries for all affected tables
-    final affectedWatches = _watches.entries.where(
-      (e) => e.value.affectedTables.intersection(affectedTables).isNotEmpty,
-    );
+    final affectedWatches = _watches.entries.where((e) {
+      // Normalize affected table names: remove crdt and view pre- and suffixes
+      final tables = SqlUtil.getAffectedTables(e.value.sql)
+          .map(
+            (e) => e.startsWith(crdtTable) ? e.replaceFirst(crdtTable, '') : e,
+          )
+          .map(
+            (e) => e.endsWith('_view')
+                ? e.replaceFirst('_view', '', e.length - '_view'.length)
+                : e,
+          )
+          .toSet();
+      return tables.intersection(affectedTables).isNotEmpty;
+    });
     for (final watch in affectedWatches) {
       unawaited(_emitQuery(watch.key, watch.value));
     }
+    onDatasetChanged(affectedTables, timestamp);
   }
 
   Future<void> _emitQuery(

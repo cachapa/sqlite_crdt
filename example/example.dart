@@ -63,7 +63,7 @@ Future<void> main() async {
   );
   await Future.delayed(Duration(milliseconds: 10));
 
-  print('Multiple writes inside a transaction for atomical updates');
+  print('Multiple writes inside a transaction for atomic updates');
   await crdt.transaction((txn) async {
     // Make sure you use the transaction object (txn)
     // Using [crdt] here will cause a deadlock
